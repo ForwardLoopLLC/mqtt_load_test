@@ -1,3 +1,6 @@
+import matplotlib
+# use Agg instead of tk
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import paho.mqtt.client as paho
