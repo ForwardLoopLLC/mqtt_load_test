@@ -16,6 +16,15 @@ from random import choice
 from time import time, sleep
 
 def wait_for_client_to_publish_to_broker(host, port):
+    '''
+    Block and wait for single client to send and receive message from broker
+
+    Args:
+        host (str):
+            URL or IP address of broker
+        port (int):
+            MQTT port of broker
+    '''
     wait_topic = 'wait/wait'
     wait_message = 'wait'
     is_ready = False
