@@ -8,7 +8,6 @@ import paho.mqtt.publish as publish
 import pandas as pd
 pd.set_option('display.max_columns', 20)
 pd.options.mode.chained_assignment = None
-
 import threading
 import os.path
 import os
@@ -16,6 +15,32 @@ import os
 from random import choice
 from time import time, sleep
 
+def wait_for_client_to_publish_to_broker(host, port):
+    wait_topic = 'wait/wait'
+    wait_message = 'wait'
+    is_ready = False
+    def on_message(mqttc, obj, msg):
+        if msg.topic == wait_topic and msg.payload.decode('utf8') == wait_message:
+            mqttc.disconnect()
+            mqttc.is_ready = True
+    client = paho.Client('wait')
+    client.on_message = on_message
+    client.is_ready = False
+    while(not client.is_ready):
+        try:
+            client.connect(host, port)
+            client.subscribe(wait_topic)
+            client.loop_start()
+            for _ in range(3):
+                publish.single(
+                    wait_topic,
+                    payload=wait_message,
+                    hostname=host,
+                    port=port
+                )
+                sleep(2)
+        except (OSError, ConnectionRefusedError):
+            sleep(10)
 
 def _sub_client(client_id, start_delay, host, port, keepalive, clean_session, n_topics, disconnect):
     '''

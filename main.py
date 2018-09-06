@@ -3,14 +3,17 @@ from load_test import *
 import os
 
 if __name__ == '__main__':
+    host = '127.0.0.1'
+    port = 1883
+    wait_for_client_to_publish_to_broker(host, port)
     name = 'test0'
     test_time = 30 
     load_test(
         name=name,
         n_sub_clients=2,
         n_pub_clients=2,
-        host=os.environ['MQTT_BROKER_HOST'],
-        port=1883,
+        host=host,
+        port=port,
         keepalive=60,
         test_time=test_time,
         sub_connect_rate=2,
