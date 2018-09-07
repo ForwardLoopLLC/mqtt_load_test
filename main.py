@@ -4,20 +4,21 @@ import os
 
 if __name__ == '__main__':
     host = os.environ['LOAD_TEST_HOST']
-    port = os.environ['LOAD_TEST_PORT'] 
+    port = int(os.environ['LOAD_TEST_PORT'])
+
     wait_for_client_to_publish_to_broker(host, port)
 
     load_test(
         name=os.environ['LOAD_TEST_NAME'], 
-        n_sub_clients=os.environ['LOAD_TEST_N_SUB_CLIENTS'],
-        n_pub_clients=os.environ['LOAD_TEST_N_PUB_CLIENTS'],
+        n_sub_clients=int(os.environ['LOAD_TEST_N_SUB_CLIENTS']),
+        n_pub_clients=int(os.environ['LOAD_TEST_N_PUB_CLIENTS']),
         host=host,
         port=port,
         keepalive=60,
-        test_time=os.environ['LOAD_TEST_TIME'],
-        sub_connect_rate=os.environ['LOAD_TEST_SUB_CONNECT_RATE'],
-        pub_message_rate=os.environ['LOAD_TEST_PUB_MESSAGE_RATE'],
-        n_topics=os.environ['LOAD_TEST_N_TOPICS'],
+        test_time=int(os.environ['LOAD_TEST_TIME']),
+        sub_connect_rate=int(os.environ['LOAD_TEST_SUB_CONNECT_RATE']),
+        pub_message_rate=int(os.environ['LOAD_TEST_PUB_MESSAGE_RATE']),
+        n_topics=int(os.environ['LOAD_TEST_N_TOPICS']),
         clean_session=True
     )
     message_data, connect_data = aggregate_test_data(name)
