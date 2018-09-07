@@ -21,7 +21,7 @@ if __name__ == '__main__':
         n_topics=int(os.environ['LOAD_TEST_N_TOPICS']),
         clean_session=True
     )
-    message_data, connect_data = aggregate_test_data(name)
+    message_data, connect_data = aggregate_test_data(os.environ['LOAD_TEST_NAME'])
     print(len(message_data))
     received_stats_data = message_received_statistics(message_data, connect_data)
     latency_data = message_latency_statistics(message_data, connect_data)
