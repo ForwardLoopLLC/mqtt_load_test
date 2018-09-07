@@ -5,23 +5,30 @@ import os
 if __name__ == '__main__':
     host = os.environ['LOAD_TEST_HOST']
     port = int(os.environ['LOAD_TEST_PORT'])
+    n_sub_clients = int(os.environ['LOAD_TEST_N_SUB_CLIENTS']),
+    n_pub_clients = int(os.environ['LOAD_TEST_N_PUB_CLIENTS']),
+    test_time = int(os.environ['LOAD_TEST_TIME']),
+    sub_connect_rate = int(os.environ['LOAD_TEST_SUB_CONNECT_RATE']),
+    pub_message_rate = int(os.environ['LOAD_TEST_PUB_MESSAGE_RATE']),
+    n_topics = int(os.environ['LOAD_TEST_N_TOPICS']),
+    plot_file = os.environ['LOAD_TEST_PLOT_FILE']
 
     wait_for_client_to_publish_to_broker(host, port)
 
     load_test(
-        name=os.environ['LOAD_TEST_NAME'], 
-        n_sub_clients=int(os.environ['LOAD_TEST_N_SUB_CLIENTS']),
-        n_pub_clients=int(os.environ['LOAD_TEST_N_PUB_CLIENTS']),
+        name=name,
+        n_sub_clients=n_sub_clients,
+        n_pub_clients=n_pub_clients,
         host=host,
         port=port,
         keepalive=60,
-        test_time=int(os.environ['LOAD_TEST_TIME']),
-        sub_connect_rate=int(os.environ['LOAD_TEST_SUB_CONNECT_RATE']),
-        pub_message_rate=int(os.environ['LOAD_TEST_PUB_MESSAGE_RATE']),
-        n_topics=int(os.environ['LOAD_TEST_N_TOPICS']),
+        test_time=test_time,
+        sub_connect_rate=sub_connect_rate,
+        pub_message_rate=pub_message_rate,
+        n_topics=n_topics,
         clean_session=True
     )
-    message_data, connect_data = aggregate_test_data(os.environ['LOAD_TEST_NAME'])
+    message_data, connect_data = aggregate_test_data(name)
     print(len(message_data))
     received_stats_data = message_received_statistics(message_data, connect_data)
     latency_data = message_latency_statistics(message_data, connect_data)
@@ -32,4 +39,4 @@ if __name__ == '__main__':
     ax[0].set_yticks(list(range(len(set(connect_data['client_id'].values)))))
     for axis in ax:
         axis.set_xlim(0, test_time+5)
-    plt.savefig(os.environ['LOAD_TEST_PLOT_FILE'])
+    plt.savefig(plot_file)
