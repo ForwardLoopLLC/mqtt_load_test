@@ -51,7 +51,7 @@ def wait_for_client_to_publish_to_broker(host, port):
         except (OSError, ConnectionRefusedError):
             sleep(10)
 
-def _sub_client(client_id, start_delay, host, port, keepalive, clean_session, n_topics, disconnect):
+def _sub_client(client_id, start_delay, host, port, keepalive, clean_session, n_topics, disconnect, message_drain_time):
     '''
     Start a parallel subscriber client
 
@@ -81,6 +81,13 @@ def _sub_client(client_id, start_delay, host, port, keepalive, clean_session, n_
             disconnect has been signaled; this is how the main process
             communicates with client threads to tell them to disconnect
             clients and stop running
+        message_drain_time (float):
+            time in seconds to maintain connection and process subscribed
+            topics AFTER disconnect has been set; if your broker-to-client
+            latency is greater than message_drain_time, you may miss messages
+            at the end of the test because the subscriber clients disconnect
+            before the messages arrive, so choose a value that is greater
+            than your expected network latency
     '''
     sleep(start_delay)
     name = client_id.split('_')[0]
@@ -108,6 +115,7 @@ def _sub_client(client_id, start_delay, host, port, keepalive, clean_session, n_
     client.loop_start()
     while(not disconnect.is_set()):
         pass
+    sleep(message_drain_time)
     csv_row = '{time},DISCONNECT\n'.format(time=str(time()))
     with open(sub_client_log_file, 'a') as sclf:
         sclf.write(csv_row)
@@ -173,7 +181,9 @@ def load_test(
     sub_connect_rate,
     pub_message_rate,
     n_topics,
-    clean_session=True):
+    clean_session,
+    subscriber_headstart_time,
+    message_drain_time):
 
     '''
     Run a controlled load test on an MQTT broker
@@ -222,7 +232,19 @@ def load_test(
             the clean session flag to use when subscribers connect to the 
             broker; if True, the client will request that the broker
             discard any previous session information (MQTT maintains sticky
-            sessions so it works in sit
+            sessions) 
+        subscriber_headstart_time (float):
+            time in seconds to start subscriber clients BEFORE starting
+            publisher clients; note that depending on your sub_connect_rate,
+            not all subscriber clients may have started before your
+            publisher clients start
+        message_drain_time (float):
+            time in seconds to maintain connection and process subscribed
+            topics AFTER disconnect has been set; if your broker-to-client
+            latency is greater than message_drain_time, you may miss messages
+            at the end of the test because the subscriber clients disconnect
+            before the messages arrive, so choose a value that is greater
+            than your expected network latency
 
     '''
 
@@ -262,11 +284,12 @@ def load_test(
                 clean_session,
                 n_topics,
                 disconnect,
+                message_drain_time,
             )
         )
         sub_thread.setDaemon(True)
         sub_thread.start()
-    sleep(5)
+    sleep(subscriber_headstart_time)
     pub_interval = n_pub_clients/pub_message_rate
     for pub_id in range(n_pub_clients):
         client_id = '{name}_pub_{pub_id}'.format(
@@ -291,7 +314,7 @@ def load_test(
     while(test_time >= time() - test_start_time):
         pass
     disconnect.set()
-    sleep(10)
+    sleep(2*message_drain_time)
    
 def aggregate_test_data(name):
     '''
@@ -428,7 +451,8 @@ def message_latency_statistics(message_data, connect_data):
         missed = set(
             _message_data[
                 (_message_data['type'] == 'pub') &
-                (_message_data['time'] >= connect_time)
+                (_message_data['time'] >= connect_time) &
+                (_message_data['time'] <= disconnect_time)
             ]['message']).symmetric_difference(
                 _message_data[
                     (_message_data['type'] == 'sub') &
@@ -439,14 +463,14 @@ def message_latency_statistics(message_data, connect_data):
             (_message_data['type'] == 'pub') &
             (_message_data['message'].isin(missed))
         ]
-        missed_origin.loc[:, 'client_id'] = int(client_id)
-        missed_origin.loc[:, 'latency'] = np.inf
-        missed_origin.loc[:, 'type'] = 'sub' 
-        missed_origin.loc[:, 'message'] = 'MISSED' 
+        missed_origin['client_id'] = int(client_id)
+        missed_origin['latency'] = np.inf
+        missed_origin['type'] = 'sub' 
+        missed_origin['message'] = 'MISSED' 
         latency_data = latency_data.append(missed_origin)
     return latency_data
 
-def plot_message_pattern(message_data, connect_data, ax=None):
+def plot_message_pattern(message_data, connect_data, client_types, ax=None):
     '''
     Plot all message publish and subscribe events for all clients
 
@@ -460,25 +484,65 @@ def plot_message_pattern(message_data, connect_data, ax=None):
             axes plot on which to plot message pattern; if ax is None, then
             a new set of axes is created using plt.subplots
     '''
+    if not 'sub' in client_types and not 'pub' in client_types:
+        return
     _message_data = message_data.copy()
     _connect_data = connect_data.copy()
+    received_stats_data = message_received_statistics(
+        _message_data, _connect_data)
     # calculate all times relative to first subscriber connect event
     min_time = min(connect_data['time'])
     _connect_data['time'] = _connect_data['time'] - min_time
     _message_data['time'] = _message_data['time'] - min_time 
     if ax is None:
         _, ax = plt.subplots()
-    # subscriber connection events are big yellow circles
-    _connect_data.plot.scatter(
-            x='time', y='client_id', ax=ax, color='y', s=16)
-    # subscriber received message events are small red circles
-    _message_data[
-        _message_data['type'] == 'sub'].plot.scatter(
-            x='time',y='client_id', ax=ax, color='r', s=1)
-    # publisher published message events are medium-size blue circles
-    _message_data[
-        _message_data['type'] == 'pub'].plot.scatter(
-            x='time',y='client_id', ax=ax, color='b', s=4)
+    n_clients = 0
+    if 'sub' in client_types:
+        # subscriber connection events are big yellow circles
+        _connect_data.plot.scatter(
+                x='time', y='client_id', ax=ax, color='y', s=16)
+        # subscriber received message events are small red circles
+        sub_data = _message_data[
+            _message_data['type'] == 'sub']
+        n_clients = max(sub_data['client_id'])
+        sub_data.plot.scatter(
+                x='time',y='client_id', ax=ax, color='r', s=1)
+        mean_received = received_stats_data.mean()
+        std_received = received_stats_data.std()
+        text_data = '''Subscriber Messages
+{n_messages} total messages
+{rate} per second
+{avg_received}±{std_received}/{avg_receivable}±{std_receivable} ({avg_perc_received}±{std_perc_received}) received'''.format(
+            n_messages=str(len(sub_data)),
+            rate=round(len(sub_data)/max(sub_data['time']), 2),
+            avg_received=round(mean_received['n_received'], 2),
+            std_received=round(std_received['n_received'], 2),
+            avg_receivable=round(mean_received['n_receivable'], 2),
+            std_receivable=round(std_received['n_receivable'], 2),
+            avg_perc_received=round(mean_received['n_received']/mean_received['n_receivable'], 2),
+            std_perc_received=round(std_received['n_received']/mean_received['n_receivable'], 2)
+        )
+        ax.text(1.2*max(sub_data['time']), 0.85*n_clients, text_data)
+    if 'pub' in  client_types:
+        # publisher published message events are medium-size blue circles
+        pub_data = _message_data[
+            _message_data['type'] == 'pub']
+        max_pub_clients = max(pub_data['client_id'])
+        if max_pub_clients > n_clients:
+            n_clients = max_pub_clients
+        pub_data.plot.scatter(
+                x='time',y='client_id', ax=ax, color='b', s=4)
+    n_yticks = 10
+    if n_clients < n_yticks:
+        n_yticks = n_clients
+    ax.set_yticks(
+        np.round(
+            np.append(
+                np.linspace(0, n_clients, 10),
+                n_clients
+            )
+        )
+    )
 
 def plot_missed_pattern(latency_data, connect_data, ax=None):
     '''
