@@ -3,22 +3,21 @@ from load_test import *
 import os
 
 if __name__ == '__main__':
-    host = '127.0.0.1'
-    port = 1883
+    host = os.environ['LOAD_TEST_HOST']
+    port = os.environ['LOAD_TEST_PORT'] 
     wait_for_client_to_publish_to_broker(host, port)
-    name = 'test0'
-    test_time = 30 
+
     load_test(
-        name=name,
-        n_sub_clients=2,
-        n_pub_clients=2,
+        name=os.environ['LOAD_TEST_NAME'], 
+        n_sub_clients=os.environ['LOAD_TEST_N_SUB_CLIENTS'],
+        n_pub_clients=os.environ['LOAD_TEST_N_PUB_CLIENTS'],
         host=host,
         port=port,
         keepalive=60,
-        test_time=test_time,
-        sub_connect_rate=2,
-        pub_message_rate=2,
-        n_topics=2,
+        test_time=os.environ['LOAD_TEST_TIME'],
+        sub_connect_rate=os.environ['LOAD_TEST_SUB_CONNECT_RATE'],
+        pub_message_rate=os.environ['LOAD_TEST_PUB_MESSAGE_RATE'],
+        n_topics=os.environ['LOAD_TEST_N_TOPICS'],
         clean_session=True
     )
     message_data, connect_data = aggregate_test_data(name)
@@ -32,4 +31,4 @@ if __name__ == '__main__':
     ax[0].set_yticks(list(range(len(set(connect_data['client_id'].values)))))
     for axis in ax:
         axis.set_xlim(0, test_time+5)
-    plt.savefig('test.png')
+    plt.savefig(os.environ['LOAD_TEST_PLOT_FILE'])
