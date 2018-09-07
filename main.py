@@ -3,6 +3,7 @@ from load_test import *
 import os
 
 if __name__ == '__main__':
+    name = os.environ['LOAD_TEST_NAME']
     host = os.environ['LOAD_TEST_HOST']
     port = int(os.environ['LOAD_TEST_PORT'])
     n_sub_clients = int(os.environ['LOAD_TEST_N_SUB_CLIENTS']),
