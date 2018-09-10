@@ -560,7 +560,7 @@ of {avg_receivable}±{std_receivable} receivable (avg per client)
             std_connects=connects.groupby('client_id').count()['topic'].std()
         )
         ax.text(
-            1.1*max_time),
+            1.1*max_time,
             0.3*n_clients,
             conn_text_data,
             color=COLORS['connection']
@@ -592,7 +592,7 @@ of {avg_receivable}±{std_receivable} receivable (avg per client)
         if 'sub' in client_types:
             y_offset_factor = 0.5
         ax.text(
-            1.1*max_time),
+            1.1*max_time,
             y_offset_factor*n_clients,
             text_data,
             color=COLORS['pub']
@@ -629,8 +629,8 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
 
     _latency_data = latency_data.copy()
     _connect_data = connect_data.copy()
-    _connect_data['time'] = _connect_data['time'] - min_time
     min_time = min(connect_data['time'])
+    _connect_data['time'] = _connect_data['time'] - min_time
     n_clients = max(connect_data['client_id']) + 1
     _latency_data['time'] = _latency_data['time'] - min_time
     max_time = max(_latency_data['time'])
