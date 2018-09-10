@@ -15,9 +15,21 @@ import os
 from random import choice
 from time import time, sleep
 
+COLORS = {
+    'sub' : 'g',
+    'pub' : 'b',
+    'connection' :'y',
+    'missed' : 'r',
+    'latency' : 'k'
+}
+
 def wait_for_client_to_publish_to_broker(host, port):
     '''
     Block and wait for single client to send and receive message from broker
+
+    This is useful for starting a broker and load testing server at the
+    same time and then waiting for the broker to initialize and begin
+    accepting connections and passing pub/sub messages.
 
     Args:
         host (str):
@@ -500,38 +512,90 @@ def plot_message_pattern(message_data, connect_data, client_types, ax=None):
     if 'sub' in client_types:
         # subscriber connection events are big yellow circles
         _connect_data.plot.scatter(
-                x='time', y='client_id', ax=ax, color='y', s=16)
+                x='time', y='client_id', ax=ax, color=COLORS['connection'], s=16)
         # subscriber received message events are small red circles
         sub_data = _message_data[
             _message_data['type'] == 'sub']
         n_clients = max(sub_data['client_id'])
         sub_data.plot.scatter(
-                x='time',y='client_id', ax=ax, color='r', s=1)
+                x='time',y='client_id', ax=ax, color=COLORS['sub'], s=1)
         mean_received = received_stats_data.mean()
         std_received = received_stats_data.std()
-        text_data = '''Subscriber Messages
-{n_messages} total messages
+        sub_text_data = '''Subscriber Messages
+{n_messages} total message(s)
 {rate} per second
-{avg_received}±{std_received}/{avg_receivable}±{std_receivable} ({avg_perc_received}±{std_perc_received}) received'''.format(
+{avg_received}±{std_received} received
+of {avg_receivable}±{std_receivable} receivable (avg per client)
+{avg_perc_received}±{std_perc_received} fraction received'''.format(
             n_messages=str(len(sub_data)),
             rate=round(len(sub_data)/max(sub_data['time']), 2),
             avg_received=round(mean_received['n_received'], 2),
             std_received=round(std_received['n_received'], 2),
             avg_receivable=round(mean_received['n_receivable'], 2),
             std_receivable=round(std_received['n_receivable'], 2),
-            avg_perc_received=round(mean_received['n_received']/mean_received['n_receivable'], 2),
-            std_perc_received=round(std_received['n_received']/mean_received['n_receivable'], 2)
+            avg_perc_received=round(
+                mean_received['n_received']/mean_received['n_receivable'], 2),
+            std_perc_received=round(
+                std_received['n_received']/mean_received['n_receivable'], 2)
         )
-        ax.text(1.2*max(sub_data['time']), 0.85*n_clients, text_data)
+        ax.text(
+            1.1*max(sub_data['time']),
+            0.75*n_clients,
+            sub_text_data,
+            color=COLORS['sub']
+        )
+        connects = _connect_data[_connect_data['topic'] == 'CONNECT']
+        conn_text_data = '''Subscriber Connections
+{n_connects} total connect(s)
+{n_disconnects} total disconnect(s)
+{avg_connects}±{std_connects} avg connects 
+'''.format(
+            n_connects=str(len(connects)),
+            n_disconnects=str(
+                len(
+                    _connect_data[
+                        _connect_data['topic'] == 'DISCONNECT'])),
+            avg_connects=connects.groupby('client_id').count()['topic'].mean(),
+            std_connects=connects.groupby('client_id').count()['topic'].std()
+        )
+        ax.text(
+            1.1*max(sub_data['time']),
+            0.3*n_clients,
+            conn_text_data,
+            color=COLORS['connection']
+        )
     if 'pub' in  client_types:
         # publisher published message events are medium-size blue circles
         pub_data = _message_data[
             _message_data['type'] == 'pub']
         max_pub_clients = max(pub_data['client_id'])
+        # if combining pub and sub, always show the total number of clients
         if max_pub_clients > n_clients:
             n_clients = max_pub_clients
         pub_data.plot.scatter(
-                x='time',y='client_id', ax=ax, color='b', s=4)
+                x='time',y='client_id', ax=ax, color=COLORS['pub'], s=4)
+        pub_count = pub_data.groupby('client_id').count()
+        pub_mean = pub_count['message'].mean()
+        pub_std = pub_count['message'].std()
+        text_data = '''Publisher Messages
+{n_messages} total message(s)
+{rate} per second
+{avg_pub}±{std_pub} (avg per client)
+'''.format(
+            n_messages=str(len(pub_data)),
+            rate=round(len(pub_data)/max(pub_data['time']), 2),
+            avg_pub=round(pub_mean, 2),
+            std_pub=round(pub_std, 2)
+        )
+        y_offset_factor = 0.75
+        if 'sub' in client_types:
+            y_offset_factor = 0.5
+        ax.text(
+            1.1*max(pub_data['time']),
+            y_offset_factor*n_clients,
+            text_data,
+            color=COLORS['pub']
+        )
     n_yticks = 10
     if n_clients < n_yticks:
         n_yticks = n_clients
@@ -564,13 +628,36 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
 
     _latency_data = latency_data.copy()
     min_time = min(connect_data['time'])
+    n_clients = max(connect_data['client_id']) + 1
     _latency_data['time'] = _latency_data['time'] - min_time
+    max_time = max(_latency_data['time'])
     missed_data = _latency_data[_latency_data['message'] == 'MISSED']
     if not missed_data.empty:
         if ax is None:
             _, ax = plt.subplots()
-        missed_data.plot.scatter(x='time', y='client_id', color='k', s=24, ax=ax)
-
+        missed_data.plot.scatter(
+            x='time',
+            y='client_id',
+            color=COLORS['missed'], 
+            s=24,
+            ax=ax
+        )
+        avg_time_frac = missed_data['time'].mean()/max_time
+        std_time_frac = missed_data['time'].std()/max_time
+        text_data = '''Missed Messages 
+{n_missed} total message(s)
+{avg_time_frac}±{std_time_frac} avg frac time elapsed
+'''.format(
+            n_missed=str(len(missed_data)),
+            avg_time_frac=round(avg_time_frac, 2),
+            std_time_frac=round(std_time_frac, 2)
+        )
+        ax.text(
+            1.1*max(_latency_data['time']),
+            0.1*n_clients,
+            text_data,
+            color=COLORS['missed']
+        )
 def plot_latency_pattern(latency_data, connect_data, ax=None):
     '''
     Plot latencies between publish and subscribe for all messages for all clients
@@ -595,4 +682,35 @@ def plot_latency_pattern(latency_data, connect_data, ax=None):
     _latency_data['time'] = _latency_data['time'] - min_time 
     if ax is None:
         _, ax = plt.subplots()
-    _latency_data.plot.scatter(x='time', y='latency', s=1, ax=ax)
+    _latency_data.plot.scatter(x='time', y='latency', s=1, color=COLORS['latency'], ax=ax)
+    received_latency = _latency_data.replace([np.inf], np.nan)
+    text_data = '''Latency Statistics
+max  {max_lat}
+avg   {avg_lat}±{std_lat}
+min   {min_lat}
+'''.format(
+        max_lat = round(max(received_latency['latency']), 2),
+        avg_lat = round(received_latency['latency'].mean(), 2),
+        std_lat = round(received_latency['latency'].std(), 2),
+        min_lat = round(min(received_latency['latency']), 2)
+    )
+    ax.text(
+        1.1*max(_latency_data['time']),
+        0.75*max(received_latency['latency']),
+        text_data,
+        color=COLORS['latency']
+    )
+
+def add_test_details_to_plot(details_text, ax0):
+    '''
+    Add test details text to top left corner of test plots
+
+    Args:
+        details_text (str):
+            test details
+        ax0 (matplotlib.axis.Axes):
+            axes of topleftmost subplot
+    '''
+    _, max_x = ax0.get_xlim()
+    _, max_y = ax0.get_ylim()
+    ax0.text(-0.12*max_x, 1.05*max_y, details_text)

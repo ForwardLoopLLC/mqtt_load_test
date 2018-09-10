@@ -15,6 +15,7 @@ if __name__ == '__main__':
     subscriber_headstart_time = int(os.environ['LOAD_TEST_SUB_HEADSTART'])
     message_drain_time = int(os.environ['LOAD_TEST_DRAIN_TIME'])
     plot_file = os.environ['LOAD_TEST_PLOT_FILE']
+    details_text = os.environ['LOAD_TEST_DETAILS_TEXT']
 
     wait_for_client_to_publish_to_broker(host, port)
 
@@ -33,16 +34,21 @@ if __name__ == '__main__':
         subscriber_headstart_time=subscriber_headstart_time,
         message_drain_time=message_drain_time
     )
+
     message_data, connect_data = aggregate_test_data(name)
-    print(len(message_data))
     plot_time = max(message_data['time']) - min(connect_data['time'])
-    received_stats_data = message_received_statistics(message_data, connect_data)
     latency_data = message_latency_statistics(message_data, connect_data)
-    _, ax = plt.subplots(2, 1, figsize=(20, 10))
+    _, ax = plt.subplots(3, 1, figsize=(20, 20))
     plot_missed_pattern(latency_data, connect_data, ax=ax[0])
-    plot_message_pattern(message_data, connect_data, ax=ax[0])
-    plot_latency_pattern(latency_data, connect_data, ax=ax[1])
-    ax[0].set_yticks(list(range(len(set(connect_data['client_id'].values)))))
+    plot_message_pattern(message_data, connect_data, client_types=['pub'], ax=ax[0])
+    ax[0].set_ylabel('Publisher Client ID')
+    plot_message_pattern(message_data, connect_data, client_types=['sub'], ax=ax[1])
+    ax[1].set_ylabel('Subscriber Client ID')
+    plot_latency_pattern(latency_data, connect_data, ax=ax[2])
+    ax[2].set_ylabel('Latency (s)')
     for axis in ax:
-        axis.set_xlim(0, plot_time+5)
+        axis.set_xlim(0, 1.4*plot_time)
+        axis.set_xlabel('')
+    ax[-1].set_xlabel('Time (s)')
+    add_test_details_to_plot(details_text=details_text, ax0=ax[0])
     plt.savefig(plot_file)
