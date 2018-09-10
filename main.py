@@ -36,7 +36,7 @@ if __name__ == '__main__':
     )
 
     message_data, connect_data = aggregate_test_data(name)
-    plot_time = max(message_data['time']) - min(connect_data['time'])
+    plot_time = max(connect_data['time']) - min(connect_data['time'])
     latency_data = message_latency_statistics(message_data, connect_data)
     _, ax = plt.subplots(3, 1, figsize=(20, 20))
     plot_missed_pattern(latency_data, connect_data, ax=ax[0])
