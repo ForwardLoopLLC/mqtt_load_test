@@ -6,7 +6,7 @@ if __name__ == '__main__':
     name = 'data/test0'
     plot_file = 't.png'
     message_data, connect_data = aggregate_test_data(name)
-    plot_time = max(message_data['time']) - min(connect_data['time'])
+    plot_time = max(connect_data['time']) - min(connect_data['time'])
     print(plot_time)
     print(len(message_data))
     latency_data = message_latency_statistics(message_data, connect_data)

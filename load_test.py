@@ -504,8 +504,8 @@ def plot_message_pattern(message_data, connect_data, client_types, ax=None):
         _message_data, _connect_data)
     # calculate all times relative to first subscriber connect event
     min_time = min(connect_data['time'])
-    max_time = max(connect_data['time'])
     _connect_data['time'] = _connect_data['time'] - min_time
+    max_time = max(_connect_data['time'])
     _message_data['time'] = _message_data['time'] - min_time 
     if ax is None:
         _, ax = plt.subplots()
@@ -633,7 +633,7 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
     _connect_data['time'] = _connect_data['time'] - min_time
     n_clients = max(connect_data['client_id']) + 1
     _latency_data['time'] = _latency_data['time'] - min_time
-    max_time = max(_latency_data['time'])
+    max_time = max(_connect_data['time'])
     missed_data = _latency_data[_latency_data['message'] == 'MISSED']
     if not missed_data.empty:
         if ax is None:
@@ -656,7 +656,7 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
             std_time_frac=round(std_time_frac, 2)
         )
         ax.text(
-            1.1*max(_connect_data['time']),
+            1.1*max_time,
             0.1*n_clients,
             text_data,
             color=COLORS['missed']
