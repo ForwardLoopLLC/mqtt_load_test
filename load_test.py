@@ -504,6 +504,7 @@ def plot_message_pattern(message_data, connect_data, client_types, ax=None):
         _message_data, _connect_data)
     # calculate all times relative to first subscriber connect event
     min_time = min(connect_data['time'])
+    max_time = max(connect_data['time'])
     _connect_data['time'] = _connect_data['time'] - min_time
     _message_data['time'] = _message_data['time'] - min_time 
     if ax is None:
@@ -539,7 +540,7 @@ of {avg_receivable}±{std_receivable} receivable (avg per client)
                 std_received['n_received']/mean_received['n_receivable'], 2)
         )
         ax.text(
-            1.1*max(sub_data['time']),
+            1.1*max_time,
             0.75*n_clients,
             sub_text_data,
             color=COLORS['sub']
@@ -559,7 +560,7 @@ of {avg_receivable}±{std_receivable} receivable (avg per client)
             std_connects=connects.groupby('client_id').count()['topic'].std()
         )
         ax.text(
-            1.1*max(sub_data['time']),
+            1.1*max_time),
             0.3*n_clients,
             conn_text_data,
             color=COLORS['connection']
@@ -591,7 +592,7 @@ of {avg_receivable}±{std_receivable} receivable (avg per client)
         if 'sub' in client_types:
             y_offset_factor = 0.5
         ax.text(
-            1.1*max(pub_data['time']),
+            1.1*max_time),
             y_offset_factor*n_clients,
             text_data,
             color=COLORS['pub']
@@ -627,6 +628,8 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
     '''
 
     _latency_data = latency_data.copy()
+    _connect_data = connect_data.copy()
+    _connect_data['time'] = _connect_data['time'] - min_time
     min_time = min(connect_data['time'])
     n_clients = max(connect_data['client_id']) + 1
     _latency_data['time'] = _latency_data['time'] - min_time
@@ -653,7 +656,7 @@ def plot_missed_pattern(latency_data, connect_data, ax=None):
             std_time_frac=round(std_time_frac, 2)
         )
         ax.text(
-            1.1*max(_latency_data['time']),
+            1.1*max(_connect_data['time']),
             0.1*n_clients,
             text_data,
             color=COLORS['missed']
@@ -695,7 +698,7 @@ min   {min_lat}
         min_lat = round(min(received_latency['latency']), 2)
     )
     ax.text(
-        1.1*max(_latency_data['time']),
+        1.1*max(_connect_data['time']),
         0.75*max(received_latency['latency']),
         text_data,
         color=COLORS['latency']
